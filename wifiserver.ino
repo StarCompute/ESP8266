@@ -174,11 +174,11 @@ void setup() {
   WiFi.softAP("WifiCar", "3.1415926"); //设立softAP
   Serial.println("Soft ap is start.");
   delay(200);
-//  WiFi.begin("CMCC-5051", "13828748112");//连接网络
+  //  WiFi.begin("CMCC-5051", "13828748112");//连接网络
   bool requestOn = false;
-//  while (WiFi.status() != WL_CONNECTED) {
-//    delay(100);
-//  }
+  //  while (WiFi.status() != WL_CONNECTED) {
+  //    delay(100);
+  //  }
   Serial.print("IP Address:");
   Serial.println(WiFi.localIP());
   WiFi.printDiag(Serial);
@@ -187,6 +187,7 @@ void setup() {
   WifiServer.on("/kaka", handleKaka);
   WifiServer.on("/ledsetting", ledSetting);
   WifiServer.on("/ledset", ledSet);
+   WifiServer.on("/showlight", showlight);
   WifiServer.on("/setdisplay", setdisplay);
 
   WifiServer.onNotFound([]() {
@@ -194,7 +195,7 @@ void setup() {
   });
   WifiServer.begin();
   Serial.println("Wifi Server is started.");
-//  setDNS();
+  //  setDNS();
   pixels.begin();
 }
 int light = 0;
@@ -204,10 +205,13 @@ void loop() {
 
   //
   // put your main code here, to run repeatedly:
-
-  light = analogRead(A0);
+  WifiServer.handleClient();
+   light = analogRead(A0);
+  if (!isDisplayFromCell)return;//如果设置不显示
+ 
   //    Serial.println(light);
   if (light <= tipLight && light > 0) {
+    Serial.println(light);
     pixels.clear();
     draw((int)light);
     //    delay(1000);
@@ -215,7 +219,7 @@ void loop() {
     //    delay(1000);
     //    //    draw((int)light);
   }
-  else if(light > darkLight*3.91 && light < 1000) {
+  else if (light > darkLight * 3.91 && light < 1000) {
     pixels.clear();
     draw((int)light);
   }
@@ -223,9 +227,9 @@ void loop() {
     pixels.clear();
     pixels.show();
   }
-  delay(200);
-  WifiServer.handleClient();
-//  dnsServer.processNextRequest();
+//  delay(100);
+
+  //  dnsServer.processNextRequest();
 }
 
 //
@@ -236,7 +240,7 @@ void loop() {
 //  dnsServer.start(DNS_PORT, "wificar", WiFi.localIP());
 //}
 void handleRoot() {
-  WifiServer.send(200, "text/html", "<h1>Hello from <b>ESP8266</b>,pls click <a href=\"/ledsetting\">here</a> to set . </h1><br/>ver 0.24 ");
+  WifiServer.send(200, "text/html", "<h1>Hello from <b>ESP8266</b>,pls click <a href=\"/ledsetting\">here</a> to set . </h1><br/><h1>Click <a href=\"/showlight\">here</a> to know the light value<h1/><br/>ver 0.24 ");
 }
 
 
@@ -258,7 +262,7 @@ void draw(int light) {
       else if (light < tipLight && light > warnLight)lines = getBin(table2[k][m], table2[k][m + 1]);
       else if (light < 220 && light >= tipLight)lines = getBin(table[k][m], table[k][m + 1]);
       else if (light >= darkLight && light <= 900)lines = getBin(table[k][m], table[k][m + 1]);
-//      else        lines = getBin(table2[k][m], table2[k][m + 1]);
+      //      else        lines = getBin(table2[k][m], table2[k][m + 1]);
 
       if (m % 4 == 2 || m % 4 == 3)//0,1 代表偶数行，2，3代表技术行，奇数行从左到右输出，偶数行从右到左输出
       {
@@ -318,6 +322,8 @@ void ledSet() {
   int len = str.length();
   int strCnt = len / 64;
   Serial.println(str);
+  Serial.println(strCnt);
+  WifiServer.send(200, "text/html", "Get your str:\r\n<br/>" );
   int *lines;
 
   int r = 255, g = 255, b = 255;
@@ -365,22 +371,23 @@ void ledSet() {
           }
           //        Serial.println("");
           p = p + 2;
-          pixels.show();
+          //          delay(2);
+          //          pixels.show();
         }
-        //      pixels.show();
+        pixels.show();
         delay(500);
         pixels.clear();
-        delay(500);
+        pixels.show();
+        delay(200);
         //      }
         //      delay(5000);
       }
     }
-    delay(1000);
+    delay(2000);
   }
   //  strCnt = fmtStr(str);
   //  STR_NUM = strCnt / 2;
-  Serial.println(strCnt);
-  WifiServer.send(200, "text/html", "Get your str:\r\n<br/>" );
+
 
 }
 
@@ -469,6 +476,9 @@ void ledSetting() {
   WifiServer.streamFile(file, "text/html");
   file.close();
 
+}
+void showlight(){
+   WifiServer.send(200, "text/html", "the right light value is :"+(String)light);
 }
 void handleKaka() {
   String state = WifiServer.arg("led");
