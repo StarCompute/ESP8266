@@ -31,10 +31,13 @@ const byte DNS_PORT = 53;
 //DNSServer dnsServer;
 
 ESP8266WebServer WifiServer(80);
-bool isDisplayFromCell = true;
+bool isDisplayFromCell = false;
 
 
-
+const unsigned char  warn[][16] =  {
+  {0x01, 0xC0, 0x03, 0xE0, 0x03, 0xE0, 0x07, 0xF0, 0x07, 0x70, 0x0F, 0x78, 0x0E, 0x38, 0x1E, 0x3C},
+  {0x1C, 0x1E, 0x38, 0x0E, 0x78, 0x0F, 0xF0, 0x07, 0xF0, 0x07, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}
+};
 const unsigned char table[][16] = {
   //   恶(0) 灵(1) 避(2) 让(3)  (4)  (5) 诸(6) 邪(7) 退(8) 散(9)
 
@@ -155,6 +158,7 @@ const unsigned char table3[][16] = {
 void setup() {
   // put your setup code here, to run once:
   pinMode(led, OUTPUT);
+  pinMode(D6, OUTPUT);
   Serial.begin(115200);
   SPIFFS.begin();
 
@@ -171,30 +175,43 @@ void setup() {
 
   EEPROM.commit();
   WiFi.mode(WIFI_AP);
-  WiFi.softAP("WifiCar", "3.1415926"); //设立softAP
+  WiFi.softAP("WifiLED", "3.1415926"); //设立softAP
   Serial.println("Soft ap is start.");
   delay(200);
-  //  WiFi.begin("CMCC-5051", "13828748112");//连接网络
+//  WiFi.begin("hotwifi", "13828748112");//连接网络
+//  WiFi.begin("CMCC-5051", "13828748112");//连接网络
   bool requestOn = false;
-  //  while (WiFi.status() != WL_CONNECTED) {
-  //    delay(100);
-  //  }
+  int k=0;
+//    while (WiFi.status() != WL_CONNECTED) {
+//      delay(100);
+//      k=k+1;
+//      if(k>=100)break;
+//    }
+//  for(int m=0;m<15;m++){
+//    if(WiFi.status()==WL_CONNECTED){
+//      break;
+//    }
+//    delay(100);
+//  }
   Serial.print("IP Address:");
-  Serial.println(WiFi.localIP());
+    Serial.println(WiFi.localIP());
+  Serial.println(WiFi.softAPIP());
   WiFi.printDiag(Serial);
   httpUpdater.setup(&WifiServer);
   WifiServer.on("/", handleRoot);
   WifiServer.on("/kaka", handleKaka);
   WifiServer.on("/ledsetting", ledSetting);
   WifiServer.on("/ledset", ledSet);
-   WifiServer.on("/showlight", showlight);
+  WifiServer.on("/showlight", showlight);
   WifiServer.on("/setdisplay", setdisplay);
+  WifiServer.on("/warnflash", warnFlash);
+  WifiServer.on("/policeflash", policeFlash);
 
   WifiServer.onNotFound([]() {
     WifiServer.send(404, "text/html", "File not found");
   });
   WifiServer.begin();
-  Serial.println("Wifi Server is started.");
+  Serial.println("Wifi Server is started..");
   //  setDNS();
   pixels.begin();
 }
@@ -202,13 +219,11 @@ int light = 0;
 
 
 void loop() {
-
-  //
   // put your main code here, to run repeatedly:
   WifiServer.handleClient();
-   light = analogRead(A0);
-  if (!isDisplayFromCell)return;//如果设置不显示
- 
+  light = analogRead(A0);
+  delay(10);
+  if (isDisplayFromCell == false)  return;//如果设置不显示
   //    Serial.println(light);
   if (light <= tipLight && light > 0) {
     Serial.println(light);
@@ -227,7 +242,7 @@ void loop() {
     pixels.clear();
     pixels.show();
   }
-//  delay(100);
+  //  delay(100);
 
   //  dnsServer.processNextRequest();
 }
@@ -240,7 +255,7 @@ void loop() {
 //  dnsServer.start(DNS_PORT, "wificar", WiFi.localIP());
 //}
 void handleRoot() {
-  WifiServer.send(200, "text/html", "<h1>Hello from <b>ESP8266</b>,pls click <a href=\"/ledsetting\">here</a> to set . </h1><br/><h1>Click <a href=\"/showlight\">here</a> to know the light value<h1/><br/>ver 0.24 ");
+  WifiServer.send(200, "text/html", "<h1>Hello from <b>ESP8266</b>,pls click <a href=\"/ledsetting\">here</a> to set . </h1><br/><h1>Click <a href=\"/update\">here</a> to update firmware.<h1/><br/><h1>Click <a href=\"/showlight\">here</a> to know the light value<h1/><br/>ver 0.31 wifi ");
 }
 
 
@@ -282,10 +297,12 @@ void draw(int light) {
     }
     if (k % 2 == 1) {//由于使用了默认字模，所以每个汉字是两个16进制数组，所以在这里进行了处理
       pixels.show();
+      digitalWrite(D6, HIGH);
       delay(500);
       //Serial.println(k);
       pixels.clear();
       pixels.show();
+      digitalWrite(D6, LOW);
       count = 0;
     }
   }
@@ -375,9 +392,11 @@ void ledSet() {
           //          pixels.show();
         }
         pixels.show();
+        digitalWrite(D6, HIGH);
         delay(500);
         pixels.clear();
         pixels.show();
+        digitalWrite(D6, LOW);
         delay(200);
         //      }
         //      delay(5000);
@@ -469,6 +488,96 @@ int* getBin(int Dec, int Dec2 ) {
 //  }
 //  return m;
 //}
+void warnFlash() {
+  int t = 0;
+  while (t < 100) {
+    drawWarn();
+    delay(100);
+    drawWarn();
+    delay(100);
+    drawWarn();
+    delay(100);
+    delay(2000);
+    t++;
+  }
+}
+void policeFlash() {
+
+  delay(1500);
+  delay(500);
+  drawColor(200, 50, 0, 0, 255, 0);
+  drawColor(200, 50, 0, 0, 255, 0);
+  drawColor(200, 50, 255, 0, 0, 64);
+  drawColor(200, 150, 255, 0, 0, 64);
+  drawDoubleColor(400, 150);
+  drawDoubleColor(400, 150);
+  drawColor(200, 50, 255, 0, 0, 0);
+  drawColor(200, 50, 255, 0, 0, 0);
+  drawColor(200, 150, 0, 0, 255, 64);
+  drawColor(200, 150, 0, 0, 255, 64);
+  drawDoubleColor(400, 100);
+  drawDoubleColor(400, 150);
+}
+
+void drawColor(int flashtime, int waitTime, int r, int g, int b, int beginnum) {
+  for (int i = beginnum;  i < beginnum + 64; i++) {
+    pixels.setPixelColor(i, r, g, b);
+  }
+  pixels.show();
+  delay(flashtime);
+  pixels.clear();
+  pixels.show();
+  delay(waitTime);
+}
+void drawDoubleColor(int flashtime, int waittime) {
+  for (int i = 128;  i < 128 + 64; i++) {
+    pixels.setPixelColor(i, 0, 0, 255);
+  }
+  for (int i = 192;  i < 192 + 64; i++) {
+    pixels.setPixelColor(i, 255, 0, 0);
+  }
+  pixels.show();
+  delay(flashtime);
+  pixels.clear();
+  pixels.show();
+  delay(waittime);
+}
+void drawWarn( ) {
+  int *lines;
+  int count = 0;
+  for (int k = 0; k < 2; k++) {
+    for (int m = 0; m < 16; m++) {
+      lines = getBin(warn[k][m], warn[k][m + 1]);
+      if (m % 4 == 2 || m % 4 == 3)//0,1 代表偶数行，2，3代表技术行，奇数行从左到右输出，偶数行从右到左输出
+      {
+        for (int i = 0; i < 16; i++) {
+          if (lines[i] == 1)pixels.setPixelColor(count, 255, 0, 0);
+          count++;
+        }
+      }
+      else {
+        for (int i = 15; i >= 0 ; i--) {
+          if (lines[i] == 1)  pixels.setPixelColor(count,  255, 0, 0);
+          count++;
+        }
+      }
+      m++;
+
+    }
+    pixels.show();
+    if (k % 2 == 1) {//由于使用了默认字模，所以每个汉字是两个16进制数组，所以在这里进行了处理
+      pixels.show();
+      digitalWrite(D6, HIGH);
+      delay(800);
+      //Serial.println(k);
+      pixels.clear();
+      pixels.show();
+      digitalWrite(D6, LOW);
+      count = 0;
+    }
+  }
+}
+
 
 void ledSetting() {
   String act = WifiServer.arg("act");
@@ -477,8 +586,8 @@ void ledSetting() {
   file.close();
 
 }
-void showlight(){
-   WifiServer.send(200, "text/html", "the right light value is :"+(String)light);
+void showlight() {
+  WifiServer.send(200, "text/html", "the right light value is :" + (String)light);
 }
 void handleKaka() {
   String state = WifiServer.arg("led");
