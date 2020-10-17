@@ -1,0 +1,286 @@
+<!DOCTYPE html PUBLIC "-//WAPFORUM//DTD XHTML Mobile 1.0//EN" "http://www.wapforum.org/DTD/xhtml-mobile10.dtd">
+ 
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>在线投递文字到LED</title>
+    <style type="text/css">
+        table.imagetable {
+            font-family: verdana, arial, sans-serif;
+            font-size: 11px;
+            color: #333333;
+            border-width: 1px;
+            border-color: #999999;
+            border-collapse: collapse;
+        }
+
+        table.imagetable th {
+            background: #b5cfd2;
+            border-width: 1px;
+            padding: 8px;
+            border-style: solid;
+            border-color: #999999;
+        }
+
+        table.imagetable td {
+            background: #dcddc0;
+            border-width: 1px;
+            padding: 8px;
+            border-style: solid;
+            border-color: #999999;
+        }
+        input{
+            height: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <form>
+        <h1>在线文字投递</h1>
+       
+        <p>
+            <input type="button" value="谢谢您的让行！" onclick="javascript:ClickThis(this);">
+        <p>
+            <input type="button" value="请关远光，谢谢！" onclick="javascript:ClickThis(this);">
+             <input type="button" value="保持车距，安全驾驶" onclick="javascript:ClickThis(this);">
+            <br /><br />
+            <input type="button" value="法律并未禁止摩托车上高速" onclick="javascript:ClickThis(this);">
+            <br /><br />
+            <input type="button"    value="天黑路滑，这社会复杂。" onclick="javascript:ClickThis(this);">
+            <br /><br />
+            <input type="button" value="显示到LED" onclick="javascript:GenAll();">
+            <input type="button" value="开启投影LED" onclick="javascript:OpenDisplay();">
+            <input type="button" value="取消投影LED" onclick="javascript:CloseAll();">
+            <table class="imagetable">
+                <tr>
+                    <th>项目</th>
+                    <th colspan="2">选项</th>
+                </tr>
+                <tr>
+                    <td>文字</td>
+                    <td colspan="2"><input type="text" id="txtWord" maxlength="15"   size=40 value="文明驾驶，遵守交规"></td>
+                </tr>
+                <tr>
+                    <td>提示(亮)</td>
+                    <td colspan="2"><input type="number" name="tiplight" id="tiplight" value="150"></td>
+                </tr>
+                <tr>
+                    <td>警告(亮)</td>
+                    <td colspan="2"><input type="number" name="warnlight" id="warnlight" value=80></td>
+                </tr>
+                <tr>
+                    <td>太暗</td>
+                    <td colspan="2"><input type="number" name="darklight" id="darklight" value=254></td>
+                </tr>
+                <tr>
+                    <td>显示次数</td>
+                    <td colspan="2"><input type="number" name="displaytimes" id="displaytimes" value=3></td>
+                </tr>
+                
+            </table>
+            <input type="button" value="故障提示" style="  background-color:  coral;" onclick="javascript:WarnFlash();">
+            <input type="button" value="警戒模式" style="  background-color:  rgb(243, 9, 9);" onclick="javascript:PoliceFlash();">
+    
+  
+            
+            <canvas id="myCanvas" width="100" height="20"></canvas>
+            <br/>
+
+    </form>
+</body>
+<script language="Javascript">
+
+    var c = document.getElementById("myCanvas");
+    var imgdata = null;
+    var ctx = c.getContext("2d");
+    var binStr = "";
+    function CloseAll() {
+        ajax({
+            type: "POST",
+            url: "/setdisplay",
+            data: { "isdisplay": 0 },
+        })
+    }
+    function WarnFlash() {
+        ajax({
+            type: "POST",
+            url: "/warnflash",
+            data: { "isdisplay": 0 },
+        })
+    }
+    function PoliceFlash() {
+        ajax({
+            type: "POST",
+            url: "/policeflash",
+            data: { "isdisplay": 0 },
+        })
+    }
+    function OpenDisplay() {
+        ajax({
+            type: "POST",
+            url: "/setdisplay",
+            data: { "isdisplay": 1 },
+        })
+    }
+    function ClickThis(obj,displaytime=2) {
+        var _val = obj.value;
+        binStr = "";
+        for (var i = 0; i < _val.length; i++) {
+            binStr += GetFill(ctx, _val[i]);
+        }
+        ajax({
+            type: "POST",
+            url: "/ledset",
+            data: { "isdisplay": 1, "str": binStr.replace(",", ""), "displaytimes":displaytime },
+        })
+    }
+    function GenAll() {
+        var txtWordVal = document.getElementById("txtWord").value;
+        binStr = "";
+        for (var i = 0; i < txtWordVal.length; i++) {
+            binStr += GetFill(ctx, txtWordVal[i]);
+            // binStr += GetFill(ctx, txtWordVal[i]) + "\r\n";
+        }
+        // binStr=binStr.replace(",","");//用替换是为了方便随时恢复。
+        var _darklight = document.getElementById("darklight").value;
+        var _warnlight = document.getElementById("warnlight").value;
+        var _tiplight = document.getElementById("tiplight").value;
+        var _displaytimes = document.getElementById("displaytimes").value;
+
+
+        ajax({
+            type: "POST",
+            url: "/ledset",
+            data: { "isdisplay": 1, "str": binStr.replace(",", ""), "darklight": _darklight, "tiplight": _tiplight, "warnlight": _warnlight, "displaytimes": _displaytimes },
+        })
+        // alert(strToHexCharCode("00001100"));
+        binStr = "";
+    }
+
+    function GetFill(cctx, strchr) {
+        ctx.fillStyle = "rgba(255,255,255,1)";
+        ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = "rgba(0, 0, 0,1)";
+        ctx.font = "16px 默认";
+        // ctx.="100";
+        ctx.textBaseline = 'top';
+        // cctx.strokeText(strchr, 0, 0);
+        cctx.fillText(strchr, 0, 0);
+        var binstr = "";
+        var m = 0;
+        var totalBinStr = "";
+        var childBinStr = "";
+        var printStr = "";
+        for (var y = 0; y < 16; y++) {
+            childBinStr = "";
+            for (var x = 0; x < 16; x++) {
+                var imgdata = cctx.getImageData(x, y, 1, 1)
+                // document.write(imgdata.data+"<BR/>");
+                if (imgdata.data[0] <= 200) {
+                    binstr += "1";
+                    printStr += "1";
+                }
+                else {
+                    binstr += "0";
+                    printStr += "0";
+                }
+                m++;
+                if (m == 8) {
+                    childBinStr += strToHexCharCode(binstr);
+                    // childBinStr += ","
+                    m = 0;
+                    binstr = "";
+                }
+            }
+            printStr += "<br/>";
+            // if (y == 0) {
+            //     childBinStr = "{" + childBinStr;
+            // }
+            // else if (y == 7) childBinStr = childBinStr + "},{";
+            // else if (y == 15) childBinStr = childBinStr + "}";
+            // else {
+            // }
+            totalBinStr += childBinStr.replace(",}", "}").replace(",,", ",");
+        }
+        printStr += "\r\n";
+        // document.write(printStr);
+        return totalBinStr;
+    }
+    function strToHexCharCode(str) {
+        var t = parseInt(str, 2)
+        var hex = t.toString(16);
+        hex = hex.length == 1 ? "0" + hex : hex;
+        return hex.toUpperCase();
+        // return "0x" + hex.toUpperCase();
+    }
+    function ajax() {
+        var ajaxData = {
+            type: arguments[0].type || "GET",
+            url: arguments[0].url || "",
+            async: arguments[0].async || "true",
+            data: arguments[0].data || null,
+            dataType: arguments[0].dataType || "text",
+            contentType: arguments[0].contentType || "application/x-www-form-urlencoded",
+            beforeSend: arguments[0].beforeSend || function () { },
+            success: arguments[0].success || function () { },
+            error: arguments[0].error || function () { }
+        }
+        ajaxData.beforeSend()
+        var xhr = createxmlHttpRequest();
+        xhr.responseType = ajaxData.dataType;
+        xhr.open(ajaxData.type, ajaxData.url, ajaxData.async);
+        xhr.setRequestHeader("Content-Type", ajaxData.contentType);
+        xhr.send(convertData(ajaxData.data));
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState == 4) {
+                if (xhr.status == 200) {
+                    ajaxData.success(xhr.response)
+                } else {
+                    ajaxData.error()
+                }
+            }
+        }
+    }
+
+    function createxmlHttpRequest() {
+        if (window.ActiveXObject) {
+            return new ActiveXObject("Microsoft.XMLHTTP");
+        } else if (window.XMLHttpRequest) {
+            return new XMLHttpRequest();
+        }
+    }
+
+    function convertData(data) {
+        if (typeof data === 'object') {
+            var convertResult = "";
+            for (var c in data) {
+                convertResult += c + "=" + data[c] + "&";
+            }
+            convertResult = convertResult.substring(0, convertResult.length - 1)
+            return convertResult;
+        } else {
+            return data;
+        }
+    }
+
+    // ajax({
+    //     type: "POST",
+    //     url: "ajax.php",
+    //     // dataType: "json",
+    //     data: { "val1": "abc", "val2": 123, "val3": "456" },
+    //     beforeSend: function () {
+    //         //some js code 
+    //     },
+    //     success: function (msg) {
+    //         console.log(msg)
+    //     },
+    //     error: function () {
+    //         console.log("error")
+    //     }
+    // })   
+</script>
+
+</html>
